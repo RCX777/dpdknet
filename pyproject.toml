@@ -1,0 +1,17 @@
+[project]
+name = "dpdknet"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy>=2.0.41",
+]
+
+[build-system]
+requires = ["setuptools>=77.0.3", "pkginfo>=1.11"]
+build-backend = "setuptools.build_meta"
+
+# [tool.setuptools.packages.find]
+# namespaces = true
+

@@ -1,0 +1,21 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-O3",
+      "-I/usr/dpdk/include",
+      "-include",
+      "rte_config.h",
+      "-march=native",
+      "-mrtm",
+      "-DALLOW_EXPERIMENTAL_API",
+      "-o",
+      "build/receive-shared",
+      "receive.c"
+    ],
+    "directory": "/home/ixia/projects/containernet/examples/dpdk",
+    "file": "/home/ixia/projects/containernet/examples/dpdk/receive.c",
+    "output": "/home/ixia/projects/containernet/examples/dpdk/build/receive-shared"
+  }
+]
