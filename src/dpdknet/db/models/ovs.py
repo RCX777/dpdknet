@@ -13,6 +13,7 @@ class OvsBridgeModel(Base):
     protocols: Column[str] = Column(String, nullable=False, default='OpenFlow10')
 
     ports = relationship('OvsPortModel', back_populates='bridge')
+    flows = relationship('OvsFlowModel', back_populates='bridge')
 
 class OvsPortModel(Base):
     __tablename__: str = 'ovs_ports'
@@ -22,3 +23,11 @@ class OvsPortModel(Base):
     bridge_id: Column[int] = Column(Integer, ForeignKey('ovs_bridges.id'))
     bridge = relationship('OvsBridgeModel', back_populates='ports')
 
+class OvsFlowModel(Base):
+    __tablename__: str = 'ovs_flows'
+
+    id: Column[int] = Column(Integer, primary_key=True)
+    match: Column[str] = Column(String, nullable=False)
+    actions: Column[str] = Column(String, nullable=False)
+    bridge_id: Column[int] = Column(Integer, ForeignKey('ovs_bridges.id'))
+    bridge = relationship('OvsBridgeModel', back_populates='flows')

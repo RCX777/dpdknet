@@ -2,6 +2,7 @@ from typing import override
 from sqlalchemy.orm import Session
 
 from dpdknet.db.models.ovs import OvsPortModel
+from dpdknet.domain.ovs.bridge import OvsBridge
 from dpdknet.utils.commands import run_command_throw
 
 
@@ -13,22 +14,27 @@ class OvsPort:
         self.model = model
         self.session = session
 
-        self.create()
-
     @property
     def name(self) -> str:
         return self.model.name
 
     @property
-    def bridge(self) -> str:
-        return self.model.bridge.name
+    def bridge(self) -> OvsBridge:
+        return OvsBridge(self.model.bridge, self.session)
+
+    @property
+    def port_number(self) -> int:
+        command = ['ovs-vsctl', 'get', 'Interface', self.name, 'ofport']
+        return int(run_command_throw(command).strip())
 
     def delete(self):
+        command = ['ovs-vsctl', 'del-port', self.bridge.name, self.name]
+        _ = run_command_throw(command)
         self.session.delete(self.model)
         self.session.commit()
 
     def create(self):
-        command = ['ovs-vsctl', 'add-port', self.bridge, self.name]
+        command = ['ovs-vsctl', 'add-port', self.bridge.name, self.name]
         _ = run_command_throw(command)
 
 
@@ -38,7 +44,7 @@ class OvsPortVhostUser(OvsPort):
 
     @override
     def create(self):
-        command = ['ovs-vsctl', 'add-port', self.bridge, self.name,
+        command = ['ovs-vsctl', 'add-port', self.bridge.name, self.name,
                    '--', 'set', 'Interface', self.name,
                    'type=dpdkvhostuser']
         _ = run_command_throw(command)

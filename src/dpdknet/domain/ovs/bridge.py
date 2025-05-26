@@ -12,11 +12,6 @@ class OvsBridge:
         self.model = model
         self.session = session
 
-        if not self.exists():
-            self.create()
-        else:
-            raise RuntimeError(f"OVS Bridge '{self.name}' already exists.")
-
     @property
     def name(self) -> str:
         return self.model.name
@@ -44,6 +39,9 @@ class OvsBridge:
         return run_command(command)[1] == 0
 
     def create(self):
+        if self.exists():
+            raise RuntimeError(f"OVS Bridge '{self.name}' already exists.")
+
         command = ['ovs-vsctl', 'add-br', self.name, '--', 'set', 'Bridge', self.name,
                    f'datapath_type={self.datapath_type}', f'protocols={self.protocols}']
         _ = run_command_throw(command)
