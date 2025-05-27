@@ -1,5 +1,7 @@
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-global Base
-Base = declarative_base()
+class BaseModel(DeclarativeBase):
+    __abstract__: bool = True
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 

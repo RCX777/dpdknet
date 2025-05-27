@@ -1,10 +1,13 @@
+from typing import override
 from sqlalchemy.orm import Session
 
 from dpdknet.db.models.ovs import OvsFlowModel
+from dpdknet.domain import BaseWrapper
 from dpdknet.domain.ovs.bridge import OvsBridge
-from dpdknet.utils.commands import run_command, run_command_throw
+from dpdknet.utils.commands import run_command_throw
 
-class OvsFlow:
+
+class OvsFlow(BaseWrapper):
     model: OvsFlowModel
     session: Session
 
@@ -34,7 +37,7 @@ class OvsFlow:
                self.bridge.protocols else 'OpenFlow10'
 
     def delete(self):
-        command = ['ovs-ofctl', 'del-flows', f'br{self.bridge_id}', self.match]
+        command = ['ovs-ofctl', 'del-flows', self.bridge.name, self.match]
         _ = run_command_throw(command)
         self.session.delete(self.model)
         self.session.commit()
@@ -44,6 +47,7 @@ class OvsFlow:
         output = run_command_throw(command)
         return any(self.match in line for line in output.splitlines())
 
+    @override
     def create(self):
         if self.exists():
             raise RuntimeError(f"OVS Flow '{self.match}' already exists.")

@@ -1,10 +1,12 @@
+from typing import override
 from sqlalchemy.orm import Session
 
 from dpdknet.db.models.ovs import OvsBridgeModel
+from dpdknet.domain import BaseWrapper
 from dpdknet.utils.commands import run_command, run_command_throw
 
 
-class OvsBridge:
+class OvsBridge(BaseWrapper):
     model: OvsBridgeModel
     session: Session
 
@@ -38,6 +40,7 @@ class OvsBridge:
         command = ['ovs-vsctl', 'list', 'Bridge', self.name]
         return run_command(command)[1] == 0
 
+    @override
     def create(self):
         if self.exists():
             raise RuntimeError(f"OVS Bridge '{self.name}' already exists.")

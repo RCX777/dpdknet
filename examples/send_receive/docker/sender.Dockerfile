@@ -12,5 +12,5 @@ RUN apt update -y && apt install -y \
 COPY ./apps /apps
 COPY ./utils /utils
 
-CMD [ "/usr/bin/env", "bash" ]
+CMD [ "/utils/run-dpdk-vhost.sh", "/apps/send/build/send-shared" ]
 

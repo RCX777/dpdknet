@@ -26,7 +26,7 @@ def init():
         os.makedirs(os.path.dirname(DPDKNET_DB_PATH), exist_ok=True)
 
         # Create SQLAlchemy engine
-        engine = create_engine(f"sqlite:///{DPDKNET_DB_PATH}", echo=True)
+        engine = create_engine(f"sqlite:///{DPDKNET_DB_PATH}", echo=False)
 
         # Create a session
         Session = sessionmaker(bind=engine)
@@ -34,9 +34,10 @@ def init():
         g_session = Session()
 
         # Create tables if they do not exist
-        from dpdknet.db.models.base import Base
-        from dpdknet.db.models.ovs import OvsBridgeModel, OvsPortModel
-        Base.metadata.create_all(engine)
+        import dpdknet.db.models.base as base
+        import dpdknet.db.models.host as _
+        import dpdknet.db.models.ovs as _
+        base.BaseModel.metadata.create_all(engine)
 
 init()
 

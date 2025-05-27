@@ -1,33 +1,36 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from dpdknet.db.models.base import Base
+from dpdknet.db.models.base import BaseModel
 
-class OvsBridgeModel(Base):
+class OvsBridgeModel(BaseModel):
     __tablename__: str = 'ovs_bridges'
 
-    id: Column[int] = Column(Integer, primary_key=True)
-    name: Column[str] = Column(String, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(unique=True, nullable=False)
 
-    datapath_type: Column[str] = Column(String, nullable=False, default='netdev')
-    protocols: Column[str] = Column(String, nullable=False, default='OpenFlow10')
+    datapath_type: Mapped[str] = mapped_column(nullable=False, default='netdev')
+    protocols: Mapped[str] = mapped_column(nullable=False, default='OpenFlow10')
 
-    ports = relationship('OvsPortModel', back_populates='bridge')
-    flows = relationship('OvsFlowModel', back_populates='bridge')
+    ports: Mapped[list['OvsPortModel']] = relationship('OvsPortModel', back_populates='bridge')
+    flows: Mapped[list['OvsFlowModel']] = relationship('OvsFlowModel', back_populates='bridge')
 
-class OvsPortModel(Base):
+
+class OvsPortModel(BaseModel):
     __tablename__: str = 'ovs_ports'
 
-    id: Column[int] = Column(Integer, primary_key=True)
-    name: Column[str] = Column(String, unique=True, nullable=False)
-    bridge_id: Column[int] = Column(Integer, ForeignKey('ovs_bridges.id'))
-    bridge = relationship('OvsBridgeModel', back_populates='ports')
+    name: Mapped[str] = mapped_column(unique=True, nullable=False)
 
-class OvsFlowModel(Base):
+    type: Mapped[str] = mapped_column(nullable=False, default='unset')
+
+    bridge_id: Mapped[int] = mapped_column(ForeignKey('ovs_bridges.id'))
+    bridge: Mapped[OvsBridgeModel] = relationship('OvsBridgeModel', back_populates='ports')
+
+
+class OvsFlowModel(BaseModel):
     __tablename__: str = 'ovs_flows'
 
-    id: Column[int] = Column(Integer, primary_key=True)
-    match: Column[str] = Column(String, nullable=False)
-    actions: Column[str] = Column(String, nullable=False)
-    bridge_id: Column[int] = Column(Integer, ForeignKey('ovs_bridges.id'))
-    bridge = relationship('OvsBridgeModel', back_populates='flows')
+    match: Mapped[str] = mapped_column(nullable=False)
+    actions: Mapped[str] = mapped_column(nullable=False)
+
+    bridge_id: Mapped[int] = mapped_column(ForeignKey('ovs_bridges.id'))
+    bridge: Mapped[OvsBridgeModel] = relationship('OvsBridgeModel', back_populates='flows')

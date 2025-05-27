@@ -17,6 +17,10 @@ make clean && make
 
 docker build -t dpdknet -f docker/Dockerfile .
 
+CONTAINERS=$(docker ps --filter name="dn.*" --filter status=running -aq)
+if [ -n "$CONTAINERS" ]; then
+    docker container rm -f "$CONTAINERS"
+fi
 docker volume rm -f openvswitch
 
 docker run --name dpdknet -it --rm \
