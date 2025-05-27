@@ -37,6 +37,7 @@ def init():
         import dpdknet.db.models.base as base
         import dpdknet.db.models.host as _
         import dpdknet.db.models.ovs as _
+        import dpdknet.db.models.link as _
         base.BaseModel.metadata.create_all(engine)
 
 init()

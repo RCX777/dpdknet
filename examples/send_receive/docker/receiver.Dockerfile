@@ -7,7 +7,8 @@ COPY ./docker/build-dpdk.sh /tmp/build-dpdk.sh
 RUN /tmp/build-dpdk.sh && rm -rf /tmp/build-dpdk.sh
 
 RUN apt update -y && apt install -y \
-    pkg-config
+    pkg-config \
+    iproute2
 
 COPY ./apps /apps
 COPY ./utils /utils

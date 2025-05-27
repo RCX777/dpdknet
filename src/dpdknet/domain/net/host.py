@@ -1,4 +1,7 @@
-from typing import overload, override
+import time
+from functools import partial
+from threading import Thread
+from typing import override
 
 import docker
 from docker.models.containers import Container
@@ -7,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from dpdknet.db.models.host import HostModel
 from dpdknet.domain import BaseWrapper
-from dpdknet.domain.ovs.port import OvsPortVhostUser
+from dpdknet.domain.ovs.port import OvsPortVeth, OvsPortVhostUser
+from dpdknet.utils.commands import run_command_throw
 
 
 class Host(BaseWrapper):
@@ -18,6 +22,9 @@ class Host(BaseWrapper):
     container: Container | None = None
 
     environment: dict[str, str]
+
+    scheduled_funcs: list[partial[None]] = []
+
 
     def __init__(self, model: HostModel, session: Session):
         self.model = model
@@ -37,19 +44,26 @@ class Host(BaseWrapper):
     def container_name(self) -> str:
         return f'dn.{self.name}'
 
+    @property
+    def pid(self) -> int | None:
+        return self.container.attrs['State']['Pid'] if self.container else None
+
     @override
     def create(self):
         pass
 
     def start(self):
-        _ = self.dcli.containers.run(
+        self.stop()
+        self.container = self.dcli.containers.run(
             image = self.docker_image,
             name = self.container_name,
             environment = self.environment,
+            remove = True,
+            detach = True, tty = True,
+            privileged = True,
         )
-        self.container = self.dcli.containers.get(
-            self.container_name
-        )
+        thread = Thread(target=self._run_scheduled_functions_blocking)
+        thread.start()
 
     def stop(self):
         if self.container:
@@ -57,8 +71,41 @@ class Host(BaseWrapper):
             self.container.remove()
             self.container = None
 
+    def _run_scheduled_functions_blocking(self):
+        while True:
+            if self.container is None:
+                time.sleep(0.2)
+                continue
+            self.container.reload()
+            if self.container.attrs['State']['Running']:
+                break
+            time.sleep(0.2)
+        time.sleep(10)
+        for f in self.scheduled_funcs:
+            f()
+        self.scheduled_funcs.clear()
+        print(f'[{self.name}] Scheduled functions executed.')
+
+    def _add_veth(self, veth: OvsPortVeth):
+        if self.container is None:
+            raise RuntimeError("Container is not running.")
+        command = ['ip', 'link', 'set', veth.name, 'netns', str(self.pid)]
+        _ = run_command_throw(command)
+        command = ['ip', 'link', 'set', f'{veth.name}-ovs', 'up']
+        _ = run_command_throw(command)
+        command = ['ip', 'link', 'set', veth.name, 'up']
+        retcode, output = self.container.exec_run(command)
+        if retcode != 0:
+            raise RuntimeError(f"Failed to set veth '{veth.name}' up: {output.decode()}")
+
+
+    def add_veth(self, veth: OvsPortVeth):
+        self.scheduled_funcs.append(partial(self._add_veth, veth))
+
 
 class DpdkHost(Host):
+    container: Container | None = None
+
     ports: list[OvsPortVhostUser] = []
 
     def __init__(self, model: HostModel, session: Session):
@@ -77,7 +124,7 @@ class DpdkHost(Host):
     @override
     def start(self):
         self.stop()
-        _ = self.dcli.containers.run(
+        self.container = self.dcli.containers.run(
             image = self.docker_image,
             name = self.container_name,
             environment = self.environment,
@@ -90,6 +137,8 @@ class DpdkHost(Host):
                 'openvswitch': {'bind': '/var/run/openvswitch', 'mode': 'ro'},
             },
         )
+        thread = Thread(target=self._run_scheduled_functions_blocking)
+        thread.start()
 
     def add_port(self, port: OvsPortVhostUser):
         if port in self.ports:
