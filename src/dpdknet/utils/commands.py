@@ -28,7 +28,7 @@ def wait_for_command_success(
     start_time = time.time()
     while True:
         if time.time() - start_time > timeout:
-            raise TimeoutError(f'Command `{' '.join(command)}` timed out after {timeout} seconds.')
+            raise TimeoutError(f'Command `{" ".join(command)}` timed out after {timeout} seconds.')
         returncode, output = runner(command)
         if returncode == 0:
             return output
