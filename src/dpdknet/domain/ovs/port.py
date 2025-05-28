@@ -52,7 +52,7 @@ class OvsPort(BaseWrapper):
 
     def update_port_number(self):
         command = ['ovs-vsctl', 'get', 'Interface', self.name, 'ofport']
-        self.model.port_number = int(run_command_throw(command).strip())
+        self.model.port_number = int(run_command_throw(command)[1].strip())
 
     @property
     def bridge(self) -> OvsBridge:
@@ -101,7 +101,7 @@ class OvsPortVeth(OvsPort):
     @override
     def update_port_number(self):
         command = ['ovs-vsctl', 'get', 'Interface', f'{self.name}-ovs', 'ofport']
-        self.model.port_number = int(run_command_throw(command).strip())
+        self.model.port_number = int(run_command_throw(command)[1].strip())
 
     @override
     def _create(self):
@@ -113,7 +113,7 @@ class OvsPortVeth(OvsPort):
 
     def veth_pair_exists(self) -> bool:
         command = ['ip', 'link', 'show', self.name]
-        _, retcode = run_command(command)
+        retcode, _ = run_command(command)
         return retcode == 0
 
     def veth_pair_create(self):

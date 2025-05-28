@@ -52,7 +52,7 @@ class OvsFlow(BaseWrapper):
 
     def exists(self) -> bool:
         command = ['ovs-ofctl', 'dump-flows', self.bridge.name]
-        output = run_command_throw(command)
+        _, output = run_command_throw(command)
         return any(self.match in line for line in output.splitlines())
 
     def get_flow_model_by_match(self) -> OvsFlowModel | None:

@@ -1,6 +1,7 @@
+import os
 import time
 from functools import partial
-from threading import Thread
+from threading import Event, Thread
 from typing import override
 
 from sqlalchemy.orm import Session
@@ -18,11 +19,11 @@ class Host(BaseWrapper):
     session: Session
 
     dcli: docker.DockerClient
-    container: Container | None = None
+    container: Container | None
 
     environment: dict[str, str]
 
-    scheduled_funcs: list[partial[None]] = []
+    scheduled_funcs: list[partial[None]]
 
     @classmethod
     def create(cls, name: str, docker_image: str):
@@ -33,7 +34,9 @@ class Host(BaseWrapper):
         self.model = model
         self.session = session
         self.dcli = docker.from_env()
+        self.container = None
         self.environment = {}
+        self.scheduled_funcs = []
 
     @property
     def name(self) -> str:
@@ -66,7 +69,7 @@ class Host(BaseWrapper):
             tty=True,
             privileged=True,
         )
-        thread = Thread(target=self._run_scheduled_functions_blocking)
+        thread = Thread(target=self._on_start)
         thread.start()
 
     def stop(self):
@@ -75,20 +78,30 @@ class Host(BaseWrapper):
             self.container.remove()
             self.container = None
 
-    def _run_scheduled_functions_blocking(self):
+    def _wait_until_ready(self):
+        while self.container is None:
+            time.sleep(0.2)
         while True:
-            if self.container is None:
-                time.sleep(0.2)
-                continue
             self.container.reload()
             if self.container.attrs['State']['Running']:
                 break
             time.sleep(0.2)
-        time.sleep(10)
+        while True:
+            pid = self.pid
+            if pid and os.path.exists(f'/proc/{pid}/ns/ipc'):
+                break
+            time.sleep(0.2)
+        print(f'[{self.name}] Container started.')
+
+    def _run_scheduled_functions(self):
         for f in self.scheduled_funcs:
             f()
         self.scheduled_funcs.clear()
         print(f'[{self.name}] Scheduled functions executed.')
+
+    def _on_start(self):
+        self._wait_until_ready()
+        self._run_scheduled_functions()
 
     def _add_veth(self, veth: OvsPortVeth):
         if self.container is None:
@@ -144,7 +157,7 @@ class DpdkHost(Host):
                 'openvswitch': {'bind': '/var/run/openvswitch', 'mode': 'ro'},
             },
         )
-        thread = Thread(target=self._run_scheduled_functions_blocking)
+        thread = Thread(target=self._on_start)
         thread.start()
 
     def add_port(self, port: OvsPortVhostUser):

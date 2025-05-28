@@ -53,7 +53,7 @@ class OvsBridge(BaseWrapper):
 
     def exists(self) -> bool:
         command = ['ovs-vsctl', 'list', 'Bridge', self.name]
-        return run_command(command)[1] == 0
+        return run_command(command)[0] == 0
 
     @override
     def _create(self):
