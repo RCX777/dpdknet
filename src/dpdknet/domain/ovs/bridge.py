@@ -1,14 +1,29 @@
 from typing import override
+
 from sqlalchemy.orm import Session
 
 from dpdknet.db.models.ovs import OvsBridgeModel
-from dpdknet.domain import BaseWrapper
+from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.utils.commands import run_command, run_command_throw
 
 
 class OvsBridge(BaseWrapper):
     model: OvsBridgeModel
     session: Session
+
+    @classmethod
+    def get(cls, name: str):
+        from dpdknet import g_session
+
+        model = g_session.query(OvsBridgeModel).filter_by(name=name).first()
+        if not model:
+            return None
+        return cls(model, g_session)
+
+    @classmethod
+    def create(cls, name: str, datapath_type: str = 'netdev', protocols: str = 'OpenFlow10'):
+        model = OvsBridgeModel(name=name, datapath_type=datapath_type, protocols=protocols)
+        return create_wrapper(model, cls)
 
     def __init__(self, model: OvsBridgeModel, session: Session):
         self.model = model
@@ -41,7 +56,7 @@ class OvsBridge(BaseWrapper):
         return run_command(command)[1] == 0
 
     @override
-    def create(self):
+    def _create(self):
         if self.exists():
             raise RuntimeError(f"OVS Bridge '{self.name}' already exists.")
 

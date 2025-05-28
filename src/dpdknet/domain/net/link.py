@@ -3,8 +3,7 @@ from typing import override
 from sqlalchemy.orm import Session
 
 from dpdknet.db.models.link import LinkModel
-from dpdknet.domain import BaseWrapper
-from dpdknet.domain.ovs import create_flow
+from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.domain.ovs.bridge import OvsBridge
 from dpdknet.domain.ovs.flow import OvsFlow
 from dpdknet.domain.ovs.port import OvsPort, OvsPortVhostUser
@@ -14,12 +13,45 @@ class Link(BaseWrapper):
     model: LinkModel
     session: Session
 
+    @classmethod
+    def create(cls, bridge: str | OvsBridge, port_src: str | OvsPort, port_dst: str | OvsPort, duplex: bool = True):
+        if isinstance(bridge, str):
+            bridge_model = OvsBridge.get(bridge)
+            if not bridge_model:
+                raise ValueError(f"Bridge '{bridge}' does not exist.")
+        else:
+            bridge_model = bridge.model
+
+        if isinstance(port_src, str):
+            port_src_model = OvsPort.get(port_src, bridge_model.name)
+            if not port_src_model:
+                raise ValueError(f"Source port '{port_src}' does not exist on bridge '{bridge_model.name}'.")
+        else:
+            port_src_model = port_src.model
+
+        if isinstance(port_dst, str):
+            port_dst_model = OvsPort.get(port_dst, bridge_model.name)
+            if not port_dst_model:
+                raise ValueError(f"Destination port '{port_dst}' does not exist on bridge '{bridge_model.name}'.")
+        else:
+            port_dst_model = port_dst.model
+
+        link = LinkModel(
+            bridge=bridge_model,
+            port_src=port_src_model,
+            port_dst=port_dst_model,
+            flow_fwd=None,
+            flow_bwd=None,
+            duplex=duplex,
+        )
+        return create_wrapper(link, cls)
+
     def __init__(self, model: LinkModel, session: Session):
         self.model = model
         self.session = session
 
     @override
-    def create(self):
+    def _create(self):
         if self.model.port_src.bridge.name != self.model.port_dst.bridge.name:
             raise ValueError('Source and destination ports must be on the same bridge.')
 
@@ -56,14 +88,14 @@ class Link(BaseWrapper):
         return OvsPort(self.model.port_dst, self.session)
 
     def _create_flow_fwd(self):
-        self.model.flow_fwd = create_flow(
+        self.model.flow_fwd = OvsFlow.create(
             match=f'in_port={self.port_src.port_number}',
             actions=f'output:{self.port_dst.port_number}',
             bridge_name=self.model.bridge.name,
         ).model
 
     def _create_flow_bwd(self):
-        self.model.flow_bwd = create_flow(
+        self.model.flow_bwd = OvsFlow.create(
             match=f'in_port={self.port_dst.port_number}',
             actions=f'output:{self.port_src.port_number}',
             bridge_name=self.model.bridge.name,

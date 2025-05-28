@@ -2,7 +2,7 @@ from typing import override
 from sqlalchemy.orm import Session
 
 from dpdknet.db.models.ovs import OvsFlowModel
-from dpdknet.domain import BaseWrapper
+from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.domain.ovs.bridge import OvsBridge
 from dpdknet.utils.commands import run_command_throw
 
@@ -10,6 +10,15 @@ from dpdknet.utils.commands import run_command_throw
 class OvsFlow(BaseWrapper):
     model: OvsFlowModel
     session: Session
+
+    @classmethod
+    def create(cls, match: str, actions: str, bridge_name: str):
+        bridge = OvsBridge.get(bridge_name)
+        if not bridge:
+            raise ValueError(f"Bridge '{bridge_name}' does not exist.")
+
+        flow = OvsFlowModel(match=match, actions=actions, bridge=bridge.model)
+        return create_wrapper(flow, cls)
 
     def __init__(self, model: OvsFlowModel, session: Session):
         self.model = model
@@ -54,7 +63,7 @@ class OvsFlow(BaseWrapper):
         return None
 
     @override
-    def create(self):
+    def _create(self):
         existing_flow = self.get_flow_model_by_match()
         if existing_flow:
             command = [

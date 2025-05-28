@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import docker
 from docker.models.containers import Container
 from dpdknet.db.models.host import HostModel
-from dpdknet.domain import BaseWrapper
+from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.domain.ovs.port import OvsPortVeth, OvsPortVhostUser
 from dpdknet.utils.commands import run_command_throw
 
@@ -23,6 +23,11 @@ class Host(BaseWrapper):
     environment: dict[str, str]
 
     scheduled_funcs: list[partial[None]] = []
+
+    @classmethod
+    def create(cls, name: str, docker_image: str):
+        model = HostModel(name=name, docker_image=docker_image)
+        return create_wrapper(model, cls)
 
     def __init__(self, model: HostModel, session: Session):
         self.model = model
@@ -47,7 +52,7 @@ class Host(BaseWrapper):
         return self.container.attrs['State']['Pid'] if self.container else None
 
     @override
-    def create(self):
+    def _create(self):
         pass
 
     def start(self):

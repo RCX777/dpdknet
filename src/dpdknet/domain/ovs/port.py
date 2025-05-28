@@ -1,8 +1,9 @@
 from typing import override
+
 from sqlalchemy.orm import Session
 
 from dpdknet.db.models.ovs import OvsPortModel
-from dpdknet.domain import BaseWrapper
+from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.domain.ovs.bridge import OvsBridge
 from dpdknet.utils.commands import run_command, run_command_throw
 
@@ -10,6 +11,28 @@ from dpdknet.utils.commands import run_command, run_command_throw
 class OvsPort(BaseWrapper):
     model: OvsPortModel
     session: Session
+
+    @classmethod
+    def get(cls, name: str, bridge_name: str):
+        from dpdknet import g_session
+
+        bridge = OvsBridge.get(bridge_name)
+        if not bridge:
+            return None
+        return g_session.query(OvsPortModel).filter_by(name=name, bridge_id=bridge.model.id).first()
+
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        bridge_name: str,
+    ):
+        bridge = OvsBridge.get(bridge_name)
+        if not bridge:
+            raise ValueError(f"Bridge '{bridge_name}' does not exist.")
+
+        port = OvsPortModel(name=name, bridge=bridge.model)
+        return create_wrapper(port, cls)
 
     def __init__(self, model: OvsPortModel, session: Session):
         self.model = model
@@ -42,7 +65,7 @@ class OvsPort(BaseWrapper):
         self.session.commit()
 
     @override
-    def create(self):
+    def _create(self):
         command = ['ovs-vsctl', 'add-port', self.bridge.name, self.name]
         _ = run_command_throw(command)
         self.update_port_number()
@@ -54,7 +77,7 @@ class OvsPortVhostUser(OvsPort):
         self.model.type = 'dpdkvhostuser'
 
     @override
-    def create(self):
+    def _create(self):
         command = [
             'ovs-vsctl',
             'add-port',
@@ -81,7 +104,7 @@ class OvsPortVeth(OvsPort):
         self.model.port_number = int(run_command_throw(command).strip())
 
     @override
-    def create(self):
+    def _create(self):
         self.veth_pair_create()
         self.veth_pair_up()
         command = ['ovs-vsctl', 'add-port', self.bridge.name, f'{self.name}-ovs']
