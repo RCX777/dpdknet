@@ -5,8 +5,13 @@ build/
 dist/
 wheels/
 *.egg-info
+.ruff_cache
 
 # Virtual environments
 .venv
 
 .cache
+
+# Not to be committed
+examples/__secret__/
+

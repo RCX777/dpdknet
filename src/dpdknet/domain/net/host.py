@@ -1,13 +1,13 @@
 import os
 import time
 from functools import partial
-from threading import Event, Thread
+from threading import Thread
 from typing import override
 
 from sqlalchemy.orm import Session
 
 import docker
-from docker.models.containers import Container
+from docker.models.containers import Container, ExecResult
 from dpdknet.db.models.host import HostModel
 from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.domain.ovs.port import OvsPortVeth, OvsPortVhostUser
@@ -97,11 +97,13 @@ class Host(BaseWrapper):
         for f in self.scheduled_funcs:
             f()
         self.scheduled_funcs.clear()
-        print(f'[{self.name}] Scheduled functions executed.')
 
     def _on_start(self):
         self._wait_until_ready()
-        self._run_scheduled_functions()
+        print(f'[{self.name}] Container ready. Running scheduled functions...')
+        while True:
+            self._run_scheduled_functions()
+            time.sleep(0.5)
 
     def _add_veth(self, veth: OvsPortVeth):
         if self.container is None:
@@ -117,6 +119,30 @@ class Host(BaseWrapper):
 
     def add_veth(self, veth: OvsPortVeth):
         self.scheduled_funcs.append(partial(self._add_veth, veth))
+
+    def _copy_file(self, src: str, dst: str):
+        if self.container is None:
+            raise RuntimeError('Container is not running.')
+        command = ['docker', 'cp', src, f'{self.container_name}:{dst}']
+        retcode, output = run_command_throw(command)
+        if retcode != 0:
+            raise RuntimeError(f"Failed to copy file to container: {output}")
+
+    def copy_file(self, src: str, dst: str):
+        self.scheduled_funcs.append(partial(self._copy_file, src, dst))
+
+    def _exec_cmd(self, command: list[str], detach: bool = False):
+        if self.container is None:
+            raise RuntimeError('Container is not running.')
+        retcode, output = self.container.exec_run(command, detach=detach)
+        if detach:
+            print(f'[{self.name}] Command scheduled: {" ".join(command)}')
+            return
+        if retcode != 0:
+            raise RuntimeError(f"Command execution failed: {output.decode()}")
+
+    def exec_cmd(self, command: list[str], detach: bool = False):
+        self.scheduled_funcs.append(partial(self._exec_cmd, command, detach))
 
 
 class DpdkHost(Host):

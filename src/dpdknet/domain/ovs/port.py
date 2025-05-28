@@ -18,8 +18,10 @@ class OvsPort(BaseWrapper):
 
         bridge = OvsBridge.get(bridge_name)
         if not bridge:
-            return None
-        return g_session.query(OvsPortModel).filter_by(name=name, bridge_id=bridge.model.id).first()
+            return
+
+        port_model = g_session.query(OvsPortModel).filter_by(name=name, bridge_id=bridge.model.id).first()
+        return cls(port_model, g_session) if port_model else None
 
     @classmethod
     def create(

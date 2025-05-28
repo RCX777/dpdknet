@@ -16,30 +16,30 @@ class Link(BaseWrapper):
     @classmethod
     def create(cls, bridge: str | OvsBridge, port_src: str | OvsPort, port_dst: str | OvsPort, duplex: bool = True):
         if isinstance(bridge, str):
-            bridge_model = OvsBridge.get(bridge)
-            if not bridge_model:
+            bridge_wrapper = OvsBridge.get(bridge)
+            if not bridge_wrapper:
                 raise ValueError(f"Bridge '{bridge}' does not exist.")
         else:
-            bridge_model = bridge.model
+            bridge_wrapper = bridge
 
         if isinstance(port_src, str):
-            port_src_model = OvsPort.get(port_src, bridge_model.name)
-            if not port_src_model:
-                raise ValueError(f"Source port '{port_src}' does not exist on bridge '{bridge_model.name}'.")
+            port_src_wrapper = OvsPort.get(port_src, bridge_wrapper.name)
+            if not port_src_wrapper:
+                raise ValueError(f"Source port '{port_src}' does not exist on bridge '{bridge_wrapper.name}'.")
         else:
-            port_src_model = port_src.model
+            port_src_wrapper = port_src
 
         if isinstance(port_dst, str):
-            port_dst_model = OvsPort.get(port_dst, bridge_model.name)
-            if not port_dst_model:
-                raise ValueError(f"Destination port '{port_dst}' does not exist on bridge '{bridge_model.name}'.")
+            port_dst_wrapper = OvsPort.get(port_dst, bridge_wrapper.name)
+            if not port_dst_wrapper:
+                raise ValueError(f"Destination port '{port_dst}' does not exist on bridge '{bridge_wrapper.name}'.")
         else:
-            port_dst_model = port_dst.model
+            port_dst_wrapper = port_dst
 
         link = LinkModel(
-            bridge=bridge_model,
-            port_src=port_src_model,
-            port_dst=port_dst_model,
+            bridge=bridge_wrapper.model,
+            port_src=port_src_wrapper.model,
+            port_dst=port_dst_wrapper.model,
             flow_fwd=None,
             flow_bwd=None,
             duplex=duplex,
