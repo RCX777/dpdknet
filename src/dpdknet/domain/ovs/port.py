@@ -55,11 +55,20 @@ class OvsPortVhostUser(OvsPort):
 
     @override
     def create(self):
-        command = ['ovs-vsctl', 'add-port', self.bridge.name, self.name,
-                   '--', 'set', 'Interface', self.name,
-                   'type=dpdkvhostuser']
+        command = [
+            'ovs-vsctl',
+            'add-port',
+            self.bridge.name,
+            self.name,
+            '--',
+            'set',
+            'Interface',
+            self.name,
+            'type=dpdkvhostuser',
+        ]
         _ = run_command_throw(command)
         self.update_port_number()
+
 
 class OvsPortVeth(OvsPort):
     def __init__(self, model: OvsPortModel, session: Session):
@@ -87,9 +96,7 @@ class OvsPortVeth(OvsPort):
     def veth_pair_create(self):
         if self.veth_pair_exists():
             self.veth_pair_delete()
-        command = ['ip', 'link', 'add', self.name,
-                   'type', 'veth',
-                   'peer', 'name', f'{self.name}-ovs']
+        command = ['ip', 'link', 'add', self.name, 'type', 'veth', 'peer', 'name', f'{self.name}-ovs']
         _ = run_command_throw(command)
 
     def veth_pair_delete(self):
@@ -101,4 +108,3 @@ class OvsPortVeth(OvsPort):
         _ = run_command_throw(command)
         command = ['ip', 'link', 'set', f'{self.name}-ovs', 'up']
         _ = run_command_throw(command)
-

@@ -45,7 +45,15 @@ class OvsBridge(BaseWrapper):
         if self.exists():
             raise RuntimeError(f"OVS Bridge '{self.name}' already exists.")
 
-        command = ['ovs-vsctl', 'add-br', self.name, '--', 'set', 'Bridge', self.name,
-                   f'datapath_type={self.datapath_type}', f'protocols={self.protocols}']
+        command = [
+            'ovs-vsctl',
+            'add-br',
+            self.name,
+            '--',
+            'set',
+            'Bridge',
+            self.name,
+            f'datapath_type={self.datapath_type}',
+            f'protocols={self.protocols}',
+        ]
         _ = run_command_throw(command)
-

@@ -9,10 +9,51 @@ dependencies = [
     "sqlalchemy>=2.0.41",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff"
+]
+
+
 [build-system]
 requires = ["setuptools>=77.0.3", "pkginfo>=1.11"]
 build-backend = "setuptools.build_meta"
 
-# [tool.setuptools.packages.find]
-# namespaces = true
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 120
+indent-style = "space"
+quote-style = "single"
+
+[tool.ruff.lint]
+select = [
+    "A",
+    "ARG",
+    "B",
+    "C",
+    "DTZ",
+    "E",
+    "EXE",
+    "F",
+    "FBT",
+    "FURB",
+    "G",
+    "I",
+    "LOG",
+    "N",
+    "PERF",
+    "PGH",
+    "PIE",
+    "PLW",
+    "RET",
+    "S",
+    "SIM",
+    "UP",
+    "W",
+    "YTT",
+]
 

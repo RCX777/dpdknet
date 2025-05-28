@@ -33,8 +33,7 @@ class OvsFlow(BaseWrapper):
 
     @property
     def protocol(self) -> str:
-        return self.bridge.protocols.split(',')[0] if \
-               self.bridge.protocols else 'OpenFlow10'
+        return self.bridge.protocols.split(',')[0] if self.bridge.protocols else 'OpenFlow10'
 
     def delete(self):
         command = ['ovs-ofctl', 'del-flows', self.bridge.name, self.match]
@@ -48,10 +47,7 @@ class OvsFlow(BaseWrapper):
         return any(self.match in line for line in output.splitlines())
 
     def get_flow_model_by_match(self) -> OvsFlowModel | None:
-        results = self.session.query(OvsFlowModel).filter_by(
-            match=self.match,
-            bridge_id=self.bridge_id
-        )
+        results = self.session.query(OvsFlowModel).filter_by(match=self.match, bridge_id=self.bridge_id)
         for flow in results:
             if flow != self.model:
                 return flow
@@ -61,15 +57,23 @@ class OvsFlow(BaseWrapper):
     def create(self):
         existing_flow = self.get_flow_model_by_match()
         if existing_flow:
-            command = ['ovs-ofctl', 'mod-flows',
-                      '-O', self.protocol,
-                      self.bridge.name,
-                      f'{self.match},actions={existing_flow.actions},{self.actions}']
+            command = [
+                'ovs-ofctl',
+                'mod-flows',
+                '-O',
+                self.protocol,
+                self.bridge.name,
+                f'{self.match},actions={existing_flow.actions},{self.actions}',
+            ]
             self.session.rollback()
             self.model = existing_flow
         else:
-            command = ['ovs-ofctl', 'add-flow',
-                       '-O', self.protocol,
-                       self.bridge.name,
-                       f'{self.match},actions={self.actions}']
+            command = [
+                'ovs-ofctl',
+                'add-flow',
+                '-O',
+                self.protocol,
+                self.bridge.name,
+                f'{self.match},actions={self.actions}',
+            ]
         _ = run_command_throw(command)

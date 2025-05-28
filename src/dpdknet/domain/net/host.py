@@ -3,11 +3,10 @@ from functools import partial
 from threading import Thread
 from typing import override
 
-import docker
-from docker.models.containers import Container
-
 from sqlalchemy.orm import Session
 
+import docker
+from docker.models.containers import Container
 from dpdknet.db.models.host import HostModel
 from dpdknet.domain import BaseWrapper
 from dpdknet.domain.ovs.port import OvsPortVeth, OvsPortVhostUser
@@ -24,7 +23,6 @@ class Host(BaseWrapper):
     environment: dict[str, str]
 
     scheduled_funcs: list[partial[None]] = []
-
 
     def __init__(self, model: HostModel, session: Session):
         self.model = model
@@ -55,12 +53,13 @@ class Host(BaseWrapper):
     def start(self):
         self.stop()
         self.container = self.dcli.containers.run(
-            image = self.docker_image,
-            name = self.container_name,
-            environment = self.environment,
-            remove = True,
-            detach = True, tty = True,
-            privileged = True,
+            image=self.docker_image,
+            name=self.container_name,
+            environment=self.environment,
+            remove=True,
+            detach=True,
+            tty=True,
+            privileged=True,
         )
         thread = Thread(target=self._run_scheduled_functions_blocking)
         thread.start()
@@ -88,7 +87,7 @@ class Host(BaseWrapper):
 
     def _add_veth(self, veth: OvsPortVeth):
         if self.container is None:
-            raise RuntimeError("Container is not running.")
+            raise RuntimeError('Container is not running.')
         command = ['ip', 'link', 'set', veth.name, 'netns', str(self.pid)]
         _ = run_command_throw(command)
         command = ['ip', 'link', 'set', f'{veth.name}-ovs', 'up']
@@ -97,7 +96,6 @@ class Host(BaseWrapper):
         retcode, output = self.container.exec_run(command)
         if retcode != 0:
             raise RuntimeError(f"Failed to set veth '{veth.name}' up: {output.decode()}")
-
 
     def add_veth(self, veth: OvsPortVeth):
         self.scheduled_funcs.append(partial(self._add_veth, veth))
@@ -111,27 +109,31 @@ class DpdkHost(Host):
     def __init__(self, model: HostModel, session: Session):
         super().__init__(model, session)
 
-        self.environment.update({
-            'DPDKNET_EAL_FLAGS': ' '.join([
-                '--no-pci',
-                '--single-file-segments',
-                '--proc-type=auto',
-                '--file-prefix=dpdk-' + self.name,
-            ]),
-        })
-
+        self.environment.update(
+            {
+                'DPDKNET_EAL_FLAGS': ' '.join(
+                    [
+                        '--no-pci',
+                        '--single-file-segments',
+                        '--proc-type=auto',
+                        '--file-prefix=dpdk-' + self.name,
+                    ]
+                ),
+            }
+        )
 
     @override
     def start(self):
         self.stop()
         self.container = self.dcli.containers.run(
-            image = self.docker_image,
-            name = self.container_name,
-            environment = self.environment,
-            remove = True,
-            detach = True, tty = True,
-            privileged = True,
-            volumes = {
+            image=self.docker_image,
+            name=self.container_name,
+            environment=self.environment,
+            remove=True,
+            detach=True,
+            tty=True,
+            privileged=True,
+            volumes={
                 '/dev/hugepages': {'bind': '/dev/hugepages', 'mode': 'rw'},
                 '/mnt/huge': {'bind': '/mnt/huge', 'mode': 'rw'},
                 'openvswitch': {'bind': '/var/run/openvswitch', 'mode': 'ro'},
@@ -149,8 +151,9 @@ class DpdkHost(Host):
         portid = len(self.ports) - 1
         socket_path = f'/var/run/openvswitch/{port.name}'
 
-        self.environment.update({
-            'DPDKNET_EAL_FLAGS': self.environment['DPDKNET_EAL_FLAGS'] +
-                f' --vdev virtio_user{portid},path={socket_path},queues=1',
-        })
-
+        self.environment.update(
+            {
+                'DPDKNET_EAL_FLAGS': self.environment['DPDKNET_EAL_FLAGS']
+                + f' --vdev virtio_user{portid},path={socket_path},queues=1',
+            }
+        )

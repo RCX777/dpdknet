@@ -13,11 +13,8 @@ def create_host[T: Host](name: str, docker_image: str, cls: type[T] = DpdkHost) 
     host = HostModel(name=name, docker_image=docker_image)
     return create_wrapper(host, cls)
 
-def create_link(bridge: str | OvsBridge,
-                port_src: str | OvsPort,
-                port_dst: str | OvsPort,
-                duplex: bool = True
-                ) -> Link:
+
+def create_link(bridge: str | OvsBridge, port_src: str | OvsPort, port_dst: str | OvsPort, duplex: bool = True) -> Link:
     if isinstance(bridge, str):
         bridge_model = get_bridge_model_by_name(bridge)
         if not bridge_model:
@@ -40,12 +37,11 @@ def create_link(bridge: str | OvsBridge,
         port_dst_model = port_dst.model
 
     link = LinkModel(
-        bridge = bridge_model,
-        port_src = port_src_model,
-        port_dst = port_dst_model,
-        flow_fwd = None,
-        flow_bwd = None,
-        duplex = duplex
+        bridge=bridge_model,
+        port_src=port_src_model,
+        port_dst=port_dst_model,
+        flow_fwd=None,
+        flow_bwd=None,
+        duplex=duplex,
     )
     return create_wrapper(link, Link)
-

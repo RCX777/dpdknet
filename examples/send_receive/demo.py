@@ -28,12 +28,9 @@ link_vhost = create_link(br0, vhost0, vhost1, duplex = True)
 link_veth = create_link(br0, vhost0, veth0, duplex = True)
 link_veth_nondpdk = create_link(br0, vhost0, veth1, duplex = True)
 
-
 sender.start()
 receiver.start()
 receiver_nondpdk.start()
-
-
 
 while True:
     time.sleep(10)

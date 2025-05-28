@@ -1,5 +1,7 @@
 from typing import override
+
 from sqlalchemy.orm import Session
+
 from dpdknet.db.models.link import LinkModel
 from dpdknet.domain import BaseWrapper
 from dpdknet.domain.ovs import create_flow
@@ -55,16 +57,16 @@ class Link(BaseWrapper):
 
     def _create_flow_fwd(self):
         self.model.flow_fwd = create_flow(
-            match = f'in_port={self.port_src.port_number}',
-            actions = f'output:{self.port_dst.port_number}',
-            bridge_name = self.model.bridge.name
+            match=f'in_port={self.port_src.port_number}',
+            actions=f'output:{self.port_dst.port_number}',
+            bridge_name=self.model.bridge.name,
         ).model
 
     def _create_flow_bwd(self):
         self.model.flow_bwd = create_flow(
-            match = f'in_port={self.port_dst.port_number}',
-            actions = f'output:{self.port_src.port_number}',
-            bridge_name = self.model.bridge.name
+            match=f'in_port={self.port_dst.port_number}',
+            actions=f'output:{self.port_src.port_number}',
+            bridge_name=self.model.bridge.name,
         ).model
 
     def down(self):
@@ -80,4 +82,3 @@ class Link(BaseWrapper):
 
         if self.model.duplex and not self.flow_bwd:
             self._create_flow_bwd()
-
