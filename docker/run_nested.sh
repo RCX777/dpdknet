@@ -17,11 +17,7 @@ make clean && make
 
 docker build -t dpdknet -f docker/Dockerfile .
 
-CONTAINERS=$(docker ps --filter name="dn.*" --filter status=running -aq)
-if [ -n "$CONTAINERS" ]; then
-    docker container rm -f "$CONTAINERS"
-fi
-docker volume rm -f openvswitch
+set +e
 
 docker run --name dpdknet -it --rm \
            --privileged --pid='host' --net='host' \
@@ -31,4 +27,10 @@ docker run --name dpdknet -it --rm \
            -v ./examples:/examples \
            -v openvswitch:/var/run/openvswitch \
            dpdknet "$@"
+
+CONTAINERS=$(docker ps --filter name='dn.*' -aq)
+if [ -z "$CONTAINERS" ]; then
+    docker container rm -f dpdknet "$CONTAINERS"
+fi
+docker volume rm -f openvswitch
 

@@ -12,6 +12,13 @@ class OvsFlow(BaseWrapper):
     session: Session
 
     @classmethod
+    def all(cls, bridge: OvsBridge):
+        from dpdknet import g_session
+
+        flows = g_session.query(OvsFlowModel).filter_by(bridge_id=bridge.model.id).all()
+        return [cls(flow, g_session) for flow in flows]
+
+    @classmethod
     def create(cls, match: str, actions: str, bridge_name: str):
         bridge = OvsBridge.get(bridge_name)
         if not bridge:

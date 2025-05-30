@@ -7,7 +7,8 @@ from typing import override
 from sqlalchemy.orm import Session
 
 import docker
-from docker.models.containers import Container, ExecResult
+import docker.errors
+from docker.models.containers import Container
 from dpdknet.db.models.host import HostModel
 from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.domain.ovs.port import OvsPortVeth, OvsPortVhostUser
@@ -24,6 +25,24 @@ class Host(BaseWrapper):
     environment: dict[str, str]
 
     scheduled_funcs: list[partial[None]]
+    scheduler_thread: Thread | None
+    scheduler_thread_stop: bool
+
+    @classmethod
+    def get(cls, name: str):
+        from dpdknet import g_session
+
+        model = g_session.query(HostModel).filter_by(name=name).first()
+        if not model:
+            return None
+        return cls(model, g_session)
+
+    @classmethod
+    def all(cls):
+        from dpdknet import g_session
+
+        models = g_session.query(HostModel).all()
+        return [cls(model, g_session) for model in models]
 
     @classmethod
     def create(cls, name: str, docker_image: str):
@@ -34,9 +53,17 @@ class Host(BaseWrapper):
         self.model = model
         self.session = session
         self.dcli = docker.from_env()
-        self.container = None
+        try:
+            self.container = self.dcli.containers.get(self.container_name)
+        except docker.errors.NotFound:
+            self.container = None
         self.environment = {}
         self.scheduled_funcs = []
+        self.scheduler_thread = None
+        self.scheduler_thread_stop = False
+
+    def __del__(self):
+        self._stop_thread()
 
     @property
     def name(self) -> str:
@@ -60,23 +87,40 @@ class Host(BaseWrapper):
 
     def start(self):
         self.stop()
-        self.container = self.dcli.containers.run(
-            image=self.docker_image,
-            name=self.container_name,
-            environment=self.environment,
-            remove=True,
-            detach=True,
-            tty=True,
-            privileged=True,
-        )
-        thread = Thread(target=self._on_start)
-        thread.start()
+        if not self.container:
+            self.container = self.dcli.containers.run(
+                image=self.docker_image,
+                name=self.container_name,
+                environment=self.environment,
+                remove=True,
+                detach=True,
+                tty=True,
+                privileged=True,
+            )
+        self._on_start()
+
+    def _stop_thread(self):
+        if self.scheduler_thread and self.scheduler_thread.is_alive():
+            self.scheduler_thread_stop = True
+            self.scheduler_thread.join()
+            self.scheduler_thread = None
 
     def stop(self):
         if self.container:
             self.container.stop()
-            self.container.remove()
+        self._stop_thread()
+
+    def _delete(self):
+        if self.container:
+            print(f'[{self.name}] Deleting container...')
+            self.container.remove(force=True)
             self.container = None
+        self._stop_thread()
+
+    def delete(self):
+        self._delete()
+        self.session.delete(self.model)
+        self.session.commit()
 
     def _wait_until_ready(self):
         while self.container is None:
@@ -98,12 +142,16 @@ class Host(BaseWrapper):
             f()
         self.scheduled_funcs.clear()
 
-    def _on_start(self):
+    def _scheduler_thread_func(self):
         self._wait_until_ready()
         print(f'[{self.name}] Container ready. Running scheduled functions...')
-        while True:
+        while self.scheduler_thread_stop is False:
             self._run_scheduled_functions()
             time.sleep(0.5)
+
+    def _on_start(self):
+        self.scheduler_thread = Thread(target=self._scheduler_thread_func)
+        self.scheduler_thread.start()
 
     def _add_veth(self, veth: OvsPortVeth):
         if self.container is None:
@@ -146,12 +194,14 @@ class Host(BaseWrapper):
 
 
 class DpdkHost(Host):
-    container: Container | None = None
+    container: Container | None
 
-    ports: list[OvsPortVhostUser] = []
+    ports: list[OvsPortVhostUser]
 
     def __init__(self, model: HostModel, session: Session):
         super().__init__(model, session)
+
+        self.ports = []
 
         self.environment.update(
             {
@@ -169,22 +219,22 @@ class DpdkHost(Host):
     @override
     def start(self):
         self.stop()
-        self.container = self.dcli.containers.run(
-            image=self.docker_image,
-            name=self.container_name,
-            environment=self.environment,
-            remove=True,
-            detach=True,
-            tty=True,
-            privileged=True,
-            volumes={
-                '/dev/hugepages': {'bind': '/dev/hugepages', 'mode': 'rw'},
-                '/mnt/huge': {'bind': '/mnt/huge', 'mode': 'rw'},
-                'openvswitch': {'bind': '/var/run/openvswitch', 'mode': 'ro'},
-            },
-        )
-        thread = Thread(target=self._on_start)
-        thread.start()
+        if not self.container:
+            self.container = self.dcli.containers.run(
+                image=self.docker_image,
+                name=self.container_name,
+                environment=self.environment,
+                remove=True,
+                detach=True,
+                tty=True,
+                privileged=True,
+                volumes={
+                    '/dev/hugepages': {'bind': '/dev/hugepages', 'mode': 'rw'},
+                    '/mnt/huge': {'bind': '/mnt/huge', 'mode': 'rw'},
+                    'openvswitch': {'bind': '/var/run/openvswitch', 'mode': 'ro'},
+                },
+            )
+        self._on_start()
 
     def add_port(self, port: OvsPortVhostUser):
         if port in self.ports:

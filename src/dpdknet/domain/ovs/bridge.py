@@ -21,6 +21,13 @@ class OvsBridge(BaseWrapper):
         return cls(model, g_session)
 
     @classmethod
+    def all(cls):
+        from dpdknet import g_session
+
+        models = g_session.query(OvsBridgeModel).all()
+        return [cls(model, g_session) for model in models]
+
+    @classmethod
     def create(cls, name: str, datapath_type: str = 'netdev', protocols: str = 'OpenFlow10'):
         model = OvsBridgeModel(name=name, datapath_type=datapath_type, protocols=protocols)
         return create_wrapper(model, cls)
@@ -45,9 +52,13 @@ class OvsBridge(BaseWrapper):
     def ports(self):
         return self.model.ports
 
+    def _delete(self):
+        if self.exists():
+            command = ['ovs-vsctl', 'del-br', self.name]
+            _ = run_command_throw(command)
+
     def delete(self):
-        command = ['ovs-vsctl', 'del-br', self.name]
-        _ = run_command_throw(command)
+        self._delete()
         self.session.delete(self.model)
         self.session.commit()
 

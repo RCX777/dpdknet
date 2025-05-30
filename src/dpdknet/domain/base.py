@@ -25,6 +25,3 @@ def create_wrapper[W: BaseWrapper](model: BaseModel, cls_wrapper: type[W]) -> W:
         _session.rollback()
         raise e
 
-
-def get_wrapper[W: BaseWrapper](model: BaseModel, cls_wrapper: type[W]) -> W:
-    return cls_wrapper(model, _session)

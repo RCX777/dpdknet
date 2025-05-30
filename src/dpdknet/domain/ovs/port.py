@@ -13,6 +13,13 @@ class OvsPort(BaseWrapper):
     session: Session
 
     @classmethod
+    def all(cls, bridge: OvsBridge):
+        from dpdknet import g_session
+
+        ports = g_session.query(OvsPortModel).filter_by(bridge_id=bridge.model.id).all()
+        return [cls(port, g_session) for port in ports]
+
+    @classmethod
     def get(cls, name: str, bridge_name: str):
         from dpdknet import g_session
 

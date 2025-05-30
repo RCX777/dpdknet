@@ -1,5 +1,6 @@
 from threading import Lock as _Lock
 
+from sqlalchemy import Engine as _Engine
 from sqlalchemy.orm import Session as _Session
 
 _init_lock = _Lock()
@@ -7,6 +8,9 @@ _initialized = False
 
 global g_session
 g_session: _Session
+
+global g_engine
+g_engine: _Engine
 
 
 def init():
@@ -27,10 +31,11 @@ def init():
         os.makedirs(os.path.dirname(DPDKNET_DB_PATH), exist_ok=True)
 
         # Create SQLAlchemy engine
-        engine = create_engine(f'sqlite:///{DPDKNET_DB_PATH}', echo=False)
+        global g_engine
+        g_engine = create_engine(f'sqlite:///{DPDKNET_DB_PATH}', echo=False)
 
         # Create a session
-        Session = sessionmaker(bind=engine)
+        Session = sessionmaker(bind=g_engine)
         global g_session
         g_session = Session()
 
@@ -40,7 +45,7 @@ def init():
         import dpdknet.db.models.ovs as _
         import dpdknet.db.models.link as _
 
-        base.BaseModel.metadata.create_all(engine)
+        base.BaseModel.metadata.create_all(g_engine)
 
 
 init()
