@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
-#include <string.h>
 
 #include <rte_eal.h>
 #include <rte_ethdev.h>
@@ -43,10 +42,6 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
     retval = rte_eth_dev_start(port);
     if (retval < 0)
         return retval;
-
-    // retval = rte_eth_promiscuous_enable(port);
-    // if (retval != 0)
-    //     return retval;
 
     return 0;
 }

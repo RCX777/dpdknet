@@ -28,9 +28,10 @@ docker run --name dpdknet -it --rm \
            -v openvswitch:/var/run/openvswitch \
            dpdknet "$@"
 
+# Cleanup
 CONTAINERS=$(docker ps --filter name='dn.*' -aq)
-if [ -z "$CONTAINERS" ]; then
-    docker container rm -f dpdknet "$CONTAINERS"
+if [ ! -z "$CONTAINERS" ]; then
+    docker container rm -f "$CONTAINERS"
 fi
-docker volume rm -f openvswitch
+docker volume rm -f openvswitch &> /dev/null || true
 
