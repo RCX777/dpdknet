@@ -6,6 +6,8 @@ from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.domain.ovs.bridge import OvsBridge
 from dpdknet.utils.commands import run_command_throw
 
+from dpdknet.db.session import g_session
+
 
 class OvsFlow(BaseWrapper):
     model: OvsFlowModel
@@ -13,19 +15,17 @@ class OvsFlow(BaseWrapper):
 
     @classmethod
     def all(cls, bridge: OvsBridge):
-        from dpdknet import g_session
-
         flows = g_session.query(OvsFlowModel).filter_by(bridge_id=bridge.model.id).all()
         return [cls(flow, g_session) for flow in flows]
 
     @classmethod
-    def create(cls, match: str, actions: str, bridge_name: str):
+    async def create(cls, match: str, actions: str, bridge_name: str):
         bridge = OvsBridge.get(bridge_name)
         if not bridge:
             raise ValueError(f"Bridge '{bridge_name}' does not exist.")
 
         flow = OvsFlowModel(match=match, actions=actions, bridge=bridge.model)
-        return create_wrapper(flow, cls)
+        return await create_wrapper(flow, cls)
 
     def __init__(self, model: OvsFlowModel, session: Session):
         self.model = model
@@ -51,15 +51,15 @@ class OvsFlow(BaseWrapper):
     def protocol(self) -> str:
         return self.bridge.protocols.split(',')[0] if self.bridge.protocols else 'OpenFlow10'
 
-    def delete(self):
+    async def delete(self):
         command = ['ovs-ofctl', 'del-flows', self.bridge.name, self.match]
-        _ = run_command_throw(command)
+        _ = await run_command_throw(command)
         self.session.delete(self.model)
         self.session.commit()
 
-    def exists(self) -> bool:
+    async def exists(self) -> bool:
         command = ['ovs-ofctl', 'dump-flows', self.bridge.name]
-        _, output = run_command_throw(command)
+        _, output = await run_command_throw(command)
         return any(self.match in line for line in output.splitlines())
 
     def get_flow_model_by_match(self) -> OvsFlowModel | None:
@@ -70,7 +70,7 @@ class OvsFlow(BaseWrapper):
         return None
 
     @override
-    def _create(self):
+    async def _create(self):
         existing_flow = self.get_flow_model_by_match()
         if existing_flow:
             command = [
@@ -92,4 +92,4 @@ class OvsFlow(BaseWrapper):
                 self.bridge.name,
                 f'{self.match},actions={self.actions}',
             ]
-        _ = run_command_throw(command)
+        _ = await run_command_throw(command)

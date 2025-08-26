@@ -6,6 +6,8 @@ from dpdknet.db.models.ovs import OvsBridgeModel
 from dpdknet.domain.base import BaseWrapper, create_wrapper
 from dpdknet.utils.commands import run_command, run_command_throw
 
+from dpdknet.db.session import g_session
+
 
 class OvsBridge(BaseWrapper):
     model: OvsBridgeModel
@@ -13,8 +15,6 @@ class OvsBridge(BaseWrapper):
 
     @classmethod
     def get(cls, name: str):
-        from dpdknet import g_session
-
         model = g_session.query(OvsBridgeModel).filter_by(name=name).first()
         if not model:
             return None
@@ -22,8 +22,6 @@ class OvsBridge(BaseWrapper):
 
     @classmethod
     def all(cls):
-        from dpdknet import g_session
-
         models = g_session.query(OvsBridgeModel).all()
         return [cls(model, g_session) for model in models]
 
@@ -52,23 +50,23 @@ class OvsBridge(BaseWrapper):
     def ports(self):
         return self.model.ports
 
-    def _delete(self):
-        if self.exists():
+    async def _delete(self):
+        if await self.exists():
             command = ['ovs-vsctl', 'del-br', self.name]
-            _ = run_command_throw(command)
+            _ = await run_command_throw(command)
 
-    def delete(self):
-        self._delete()
+    async def delete(self):
+        await self._delete()
         self.session.delete(self.model)
         self.session.commit()
 
-    def exists(self) -> bool:
+    async def exists(self) -> bool:
         command = ['ovs-vsctl', 'list', 'Bridge', self.name]
-        return run_command(command)[0] == 0
+        return (await run_command(command))[0] == 0
 
     @override
-    def _create(self):
-        if self.exists():
+    async def _create(self):
+        if await self.exists():
             raise RuntimeError(f"OVS Bridge '{self.name}' already exists.")
 
         command = [
@@ -82,4 +80,4 @@ class OvsBridge(BaseWrapper):
             f'datapath_type={self.datapath_type}',
             f'protocols={self.protocols}',
         ]
-        _ = run_command_throw(command)
+        _ = await run_command_throw(command)

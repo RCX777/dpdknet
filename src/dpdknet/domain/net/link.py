@@ -14,7 +14,7 @@ class Link(BaseWrapper):
     session: Session
 
     @classmethod
-    def create(cls, bridge: str | OvsBridge, port_src: str | OvsPort, port_dst: str | OvsPort, duplex: bool = True):
+    async def create(cls, bridge: str | OvsBridge, port_src: str | OvsPort, port_dst: str | OvsPort, duplex: bool = True):
         if isinstance(bridge, str):
             bridge_wrapper = OvsBridge.get(bridge)
             if not bridge_wrapper:
@@ -44,20 +44,20 @@ class Link(BaseWrapper):
             flow_bwd=None,
             duplex=duplex,
         )
-        return create_wrapper(link, cls)
+        return await create_wrapper(link, cls)
 
     def __init__(self, model: LinkModel, session: Session):
         self.model = model
         self.session = session
 
     @override
-    def _create(self):
+    async def _create(self):
         if self.model.port_src.bridge.name != self.model.port_dst.bridge.name:
             raise ValueError('Source and destination ports must be on the same bridge.')
 
-        self._create_flow_fwd()
+        await self._create_flow_fwd()
         if self.model.duplex:
-            self._create_flow_bwd()
+            await self._create_flow_bwd()
 
     @property
     def flow_fwd(self) -> OvsFlow | None:
@@ -87,30 +87,30 @@ class Link(BaseWrapper):
             return OvsPortVhostUser(self.model.port_dst, self.session)
         return OvsPort(self.model.port_dst, self.session)
 
-    def _create_flow_fwd(self):
-        self.model.flow_fwd = OvsFlow.create(
+    async def _create_flow_fwd(self):
+        self.model.flow_fwd = (await OvsFlow.create(
             match=f'in_port={self.port_src.port_number}',
             actions=f'output:{self.port_dst.port_number}',
             bridge_name=self.model.bridge.name,
-        ).model
+        )).model
 
-    def _create_flow_bwd(self):
-        self.model.flow_bwd = OvsFlow.create(
+    async def _create_flow_bwd(self):
+        self.model.flow_bwd = (await OvsFlow.create(
             match=f'in_port={self.port_dst.port_number}',
             actions=f'output:{self.port_src.port_number}',
             bridge_name=self.model.bridge.name,
-        ).model
+        )).model
 
-    def down(self):
+    async def down(self):
         if self.flow_fwd:
-            self.flow_fwd.delete()
+            await self.flow_fwd.delete()
 
         if self.flow_bwd:
-            self.flow_bwd.delete()
+            await self.flow_bwd.delete()
 
-    def up(self):
+    async def up(self):
         if not self.flow_fwd:
-            self._create_flow_fwd()
+            await self._create_flow_fwd()
 
         if self.model.duplex and not self.flow_bwd:
-            self._create_flow_bwd()
+            await self._create_flow_bwd()
