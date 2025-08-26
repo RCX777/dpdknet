@@ -8,3 +8,4 @@ class HostModel(BaseModel):
 
     name: Mapped[str] = mapped_column(unique=True, nullable=False)
     docker_image: Mapped[str] = mapped_column(nullable=False)
+    started: Mapped[bool] = mapped_column(default=False, nullable=False)

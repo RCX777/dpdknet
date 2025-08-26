@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import override
 
+from dpdknet.domain.net.host import Host
+
 @dataclass
 class TaskResult:
     stdout: str = ''
@@ -36,22 +38,27 @@ class Task(ABC):
 class CmdTask(Task):
     result: TaskResult
     cmd: str
-    container: str
+    host: Host | None
 
     def __init__(self,
                  name: str,
                  cmd: str,
-                 container: str = '',
+                 host: Host | None = None,
                  deps: list['Task'] | None = None):
         super().__init__(name, deps)
         self.cmd = cmd
-        self.container = container
+        self.host = host
 
     @override
     async def _run(self):
+        if self.host:
+            if not self.host.started:
+                raise RuntimeError(f'[task] Host "{self.host.name}" is not started.')
+            cmd = f'docker exec -it {self.host.container_name} bash -c "{self.cmd}"'
+        else:
+            cmd = self.cmd
         process = await asyncio.create_subprocess_shell(
-            f'docker exec -it dn.{self.container} bash -c "{self.cmd}"'
-                if self.container else self.cmd,
+            cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -65,16 +72,16 @@ class CmdTask(Task):
 class CopyTask(Task):
     result: TaskResult
     src_path: str
-    src_container: str
+    src_container: Host | None
     dst_path: str
-    dst_container: str
+    dst_container: Host | None
 
     def __init__(self,
                  name: str,
                  src_path: str,
                  dst_path: str,
-                 src_container: str = '',
-                 dst_container: str = '',
+                 src_container: Host | None = None,
+                 dst_container: Host | None = None,
                  deps: list['Task'] | None = None):
         super().__init__(name, deps)
         self.src_path = src_path
@@ -84,23 +91,28 @@ class CopyTask(Task):
 
     @override
     async def _run(self):
-        cmd = 'cp'
-        if self.src_container or self.dst_container:
-            cmd = 'docker cp'
-        source = f'dn.{self.src_container}:{self.src_path}' if self.src_container else self.src_path
-        destination = f'dn.{self.dst_container}:{self.dst_path}' if self.dst_container else self.dst_path
-        cmd = f'{cmd} {source} {destination}'
-        process = await asyncio.create_subprocess_shell(
-            cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
-        self.result = TaskResult(
-            stdout=stdout.decode().strip(),
-            stderr=stderr.decode().strip(),
-            returncode=process.returncode or 1 # should never be None
-        )
+        if self.src_container is None:
+            if self.dst_container is None:
+                cmd = f'cp {self.src_path} {self.dst_path}'
+            else:
+                cmd = f'docker cp {self.src_path} {self.dst_container.container_name}:{self.dst_path}'
+            process = await asyncio.create_subprocess_shell(
+                cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+            self.result = TaskResult(
+                stdout=stdout.decode().strip(),
+                stderr=stderr.decode().strip(),
+                returncode=process.returncode or 1 # should never be None
+            )
+        else:
+            await self.src_container.copy_file(
+                self.src_path,
+                self.dst_path,
+                dst_host=self.dst_container
+            )
 
 
 class TaskScheduler:
@@ -112,26 +124,8 @@ class TaskScheduler:
     async def run(self):
         _ = await asyncio.gather(*(task.run() for task in self.tasks.values()))
 
-    def add_task(self,
-                 name: str,
-                 action: str,
-                 container: str = '',
-                 deps: list[str] | None = None):
-        dependencies = [self.tasks[dep] for dep in deps] if deps else None
-        self.tasks[name] = CmdTask(name, action, container, deps=dependencies)
-
-    def add_copy_task(self,
-                     name: str,
-                     src_path: str,
-                     dst_path: str,
-                     src_container: str = '',
-                     dst_container: str = '',
-                     deps: list[str] | None = None):
-        dependencies = [self.tasks[dep] for dep in deps] if deps else None
-        self.tasks[name] = CopyTask(name,
-                                    src_path,
-                                    dst_path,
-                                    src_container,
-                                    dst_container,
-                                    deps=dependencies)
+    def add_task(self, task: Task):
+        if task.name in self.tasks:
+            raise ValueError(f'Task with name {task.name} already exists.')
+        self.tasks[task.name] = task
 

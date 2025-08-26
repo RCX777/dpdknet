@@ -55,7 +55,11 @@ ENV OVSDB_PIDFILE="$OVS_SOCK_PATH/ovsdb-server.pid"
 ENV OVS_RUNDIR="$OVS_SOCK_PATH"
 
 # Adds iproute2 (for veth support)
-RUN apt update -y && apt install -y iproute2 iputils-ping
+RUN apt update -y && apt install -y \
+    iproute2 \
+    iputils-ping \
+    tcpdump \
+    wireshark-common
 
 # Install dpdknet
 COPY dist/ /tmp/dpdknet/
